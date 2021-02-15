@@ -1,4 +1,4 @@
-module github.com/gassara-kys/go-sqs-poller/v3
+module github.com/gassara-kys/go-sqs-poller
 
 go 1.15
 

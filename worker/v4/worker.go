@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/ca-risken/common/pkg/logging"
 )
 
 // HandlerFunc is used to define the Handler that is run on for each message
@@ -55,7 +56,7 @@ type QueueDeleteReceiverAPI interface {
 // Worker struct
 type Worker struct {
 	Config    *Config
-	Log       LoggerIFace
+	Log       logging.Logger
 	SqsClient QueueDeleteReceiverAPI
 }
 
@@ -74,7 +75,7 @@ func New(client QueueAPI, config *Config) *Worker {
 
 	return &Worker{
 		Config:    config,
-		Log:       &logger{},
+		Log:       logging.NewLogger(),
 		SqsClient: client,
 	}
 }
@@ -87,7 +88,7 @@ func (worker *Worker) Start(ctx context.Context, h Handler) {
 			log.Println("worker: Stopping polling because a context kill signal was sent")
 			return
 		default:
-			worker.Log.Debug("worker: Start Polling")
+			worker.Log.Debug(ctx, "worker: Start Polling")
 
 			params := &sqs.ReceiveMessageInput{
 				QueueUrl:            aws.String(worker.Config.QueueURL), // Required
@@ -113,7 +114,7 @@ func (worker *Worker) Start(ctx context.Context, h Handler) {
 // poll launches goroutine per received message and wait for all message to be processed
 func (worker *Worker) run(h Handler, messages []*sqs.Message) {
 	numMessages := len(messages)
-	worker.Log.Info(fmt.Sprintf("worker: Received %d messages", numMessages))
+	worker.Log.Info(context.TODO(), fmt.Sprintf("worker: Received %d messages", numMessages))
 
 	var wg sync.WaitGroup
 	wg.Add(numMessages)
@@ -122,7 +123,7 @@ func (worker *Worker) run(h Handler, messages []*sqs.Message) {
 			// launch goroutine
 			defer wg.Done()
 			if err := worker.handleMessage(m, h); err != nil {
-				worker.Log.Error(err.Error())
+				worker.Log.Error(context.TODO(), err.Error())
 			}
 		}(messages[i])
 	}
@@ -134,7 +135,7 @@ func (worker *Worker) handleMessage(m *sqs.Message, h Handler) error {
 	var err error
 	err = h.HandleMessage(m)
 	if _, ok := err.(InvalidEventError); ok {
-		worker.Log.Error(err.Error())
+		worker.Log.Error(context.TODO(), err.Error())
 	} else if err != nil {
 		return err
 	}
@@ -147,7 +148,7 @@ func (worker *Worker) handleMessage(m *sqs.Message, h Handler) error {
 	if err != nil {
 		return err
 	}
-	worker.Log.Debug(fmt.Sprintf("worker: deleted message from queue: %s", aws.StringValue(m.ReceiptHandle)))
+	worker.Log.Debug(context.TODO(), fmt.Sprintf("worker: deleted message from queue: %s", aws.StringValue(m.ReceiptHandle)))
 
 	return nil
 }

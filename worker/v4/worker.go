@@ -105,16 +105,16 @@ func (worker *Worker) Start(ctx context.Context, h Handler) {
 				continue
 			}
 			if len(resp.Messages) > 0 {
-				worker.run(h, resp.Messages)
+				worker.run(ctx, h, resp.Messages)
 			}
 		}
 	}
 }
 
 // poll launches goroutine per received message and wait for all message to be processed
-func (worker *Worker) run(h Handler, messages []*sqs.Message) {
+func (worker *Worker) run(ctx context.Context, h Handler, messages []*sqs.Message) {
 	numMessages := len(messages)
-	worker.Log.Info(context.TODO(), fmt.Sprintf("worker: Received %d messages", numMessages))
+	worker.Log.Info(ctx, fmt.Sprintf("worker: Received %d messages", numMessages))
 
 	var wg sync.WaitGroup
 	wg.Add(numMessages)
@@ -122,8 +122,8 @@ func (worker *Worker) run(h Handler, messages []*sqs.Message) {
 		go func(m *sqs.Message) {
 			// launch goroutine
 			defer wg.Done()
-			if err := worker.handleMessage(m, h); err != nil {
-				worker.Log.Error(context.TODO(), err.Error())
+			if err := worker.handleMessage(ctx, m, h); err != nil {
+				worker.Log.Error(ctx, err.Error())
 			}
 		}(messages[i])
 	}
@@ -131,11 +131,11 @@ func (worker *Worker) run(h Handler, messages []*sqs.Message) {
 	wg.Wait()
 }
 
-func (worker *Worker) handleMessage(m *sqs.Message, h Handler) error {
+func (worker *Worker) handleMessage(ctx context.Context, m *sqs.Message, h Handler) error {
 	var err error
 	err = h.HandleMessage(m)
 	if _, ok := err.(InvalidEventError); ok {
-		worker.Log.Error(context.TODO(), err.Error())
+		worker.Log.Error(ctx, err.Error())
 	} else if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (worker *Worker) handleMessage(m *sqs.Message, h Handler) error {
 	if err != nil {
 		return err
 	}
-	worker.Log.Debug(context.TODO(), fmt.Sprintf("worker: deleted message from queue: %s", aws.StringValue(m.ReceiptHandle)))
+	worker.Log.Debug(ctx, fmt.Sprintf("worker: deleted message from queue: %s", aws.StringValue(m.ReceiptHandle)))
 
 	return nil
 }

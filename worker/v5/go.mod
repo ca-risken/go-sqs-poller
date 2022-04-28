@@ -3,7 +3,8 @@ module github.com/gassara-kys/go-sqs-poller/worker/v5
 go 1.17
 
 require (
-	github.com/aws/aws-sdk-go v1.44.2
+	github.com/aws/aws-sdk-go-v2 v1.0.0
+	github.com/aws/aws-sdk-go-v2/service/sqs v1.0.0
 	github.com/ca-risken/common/pkg/logging v0.0.0-20220426050416-a654045b9fa5
 	github.com/stretchr/testify v1.7.1
 )
@@ -14,13 +15,13 @@ require (
 	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
 	github.com/DataDog/sketches-go v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
+	github.com/aws/smithy-go v1.11.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/philhofer/fwd v1.1.1 // indirect

@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -21,7 +22,7 @@ type mockedSqsClient struct {
 }
 
 func (c *mockedSqsClient) GetQueueUrl(urlInput *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
-	url := fmt.Sprintf("https://sqs.%v.amazonaws.com/123456789/%v", *c.Config.Region, *urlInput.QueueName)
+	url := fmt.Sprintf("https://sqs.%v.amazonaws.com/123456789/%v", c.Config.Region, *urlInput.QueueName)
 
 	return &sqs.GetQueueUrlOutput{QueueUrl: &url}, nil
 }
@@ -57,7 +58,7 @@ const waitTimeSecond = 1337
 
 func TestStart(t *testing.T) {
 	region := "eu-west-1"
-	awsConfig := &aws.Config{Region: &region}
+	awsConfig := &aws.Config{Region: region}
 	workerConfig := &Config{
 		MaxNumberOfMessage: maxNumberOfMessages,
 		QueueName:          "my-sqs-queue",
@@ -65,8 +66,8 @@ func TestStart(t *testing.T) {
 	}
 
 	clientParams := buildClientParams()
-	sqsMessage := &sqs.Message{Body: aws.String(`{ "foo": "bar", "qux": "baz" }`)}
-	sqsResponse := sqs.ReceiveMessageOutput{Messages: []*sqs.Message{sqsMessage}}
+	sqsMessage := types.Message{Body: aws.String(`{ "foo": "bar", "qux": "baz" }`)}
+	sqsResponse := sqs.ReceiveMessageOutput{Messages: []types.Message{sqsMessage}}
 	client := &mockedSqsClient{Response: sqsResponse, Config: awsConfig}
 	deleteInput := &sqs.DeleteMessageInput{QueueUrl: clientParams.QueueUrl}
 
@@ -76,10 +77,10 @@ func TestStart(t *testing.T) {
 	defer cancel()
 
 	handler := new(mockedHandler)
-	handlerFunc := HandlerFunc(func(msg *sqs.Message) (err error) {
+	handlerFunc := HandlerFunc(func(msg *types.Message) (err error) {
 		event := &sqsEvent{}
 
-		json.Unmarshal([]byte(aws.StringValue(msg.Body)), event)
+		json.Unmarshal([]byte(aws.ToString(msg.Body)), event)
 
 		handler.HandleMessage(event.Foo, event.Qux)
 
@@ -89,8 +90,8 @@ func TestStart(t *testing.T) {
 	t.Run("the worker has correct configuration", func(t *testing.T) {
 		assert.Equal(t, worker.Config.QueueName, "my-sqs-queue", "QueueName has been set properly")
 		assert.Equal(t, worker.Config.QueueURL, "https://sqs.eu-west-1.amazonaws.com/123456789/my-sqs-queue", "QueueURL has been set properly")
-		assert.Equal(t, worker.Config.MaxNumberOfMessage, int64(maxNumberOfMessages), "MaxNumberOfMessage has been set properly")
-		assert.Equal(t, worker.Config.WaitTimeSecond, int64(waitTimeSecond), "WaitTimeSecond has been set properly")
+		assert.Equal(t, worker.Config.MaxNumberOfMessage, int32(maxNumberOfMessages), "MaxNumberOfMessage has been set properly")
+		assert.Equal(t, worker.Config.WaitTimeSecond, int32(waitTimeSecond), "WaitTimeSecond has been set properly")
 	})
 
 	t.Run("the worker has correct default configuration", func(t *testing.T) {
@@ -101,8 +102,8 @@ func TestStart(t *testing.T) {
 
 		assert.Equal(t, worker.Config.QueueName, "my-sqs-queue", "QueueName has been set properly")
 		assert.Equal(t, worker.Config.QueueURL, "https://sqs.eu-west-1.amazonaws.com/123456789/my-sqs-queue", "QueueURL has been set properly")
-		assert.Equal(t, worker.Config.MaxNumberOfMessage, int64(10), "MaxNumberOfMessage has been set by default")
-		assert.Equal(t, worker.Config.WaitTimeSecond, int64(20), "WaitTimeSecond has been set by default")
+		assert.Equal(t, worker.Config.MaxNumberOfMessage, int32(10), "MaxNumberOfMessage has been set by default")
+		assert.Equal(t, worker.Config.WaitTimeSecond, int32(20), "WaitTimeSecond has been set by default")
 	})
 
 	t.Run("the worker successfully processes a message", func(t *testing.T) {
@@ -128,8 +129,8 @@ func buildClientParams() *sqs.ReceiveMessageInput {
 
 	return &sqs.ReceiveMessageInput{
 		QueueUrl:            url,
-		MaxNumberOfMessages: aws.Int64(maxNumberOfMessages),
-		AttributeNames:      []*string{aws.String("All")},
-		WaitTimeSeconds:     aws.Int64(waitTimeSecond),
+		MaxNumberOfMessages: int32(maxNumberOfMessages),
+		AttributeNames:      []types.QueueAttributeName{"All"},
+		WaitTimeSeconds:     int32(waitTimeSecond),
 	}
 }

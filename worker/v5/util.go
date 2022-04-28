@@ -3,18 +3,9 @@ package worker
 import (
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sqs"
-	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
-
-// CreateSqsClient creates a client for SQS API
-func CreateSqsClient(awsConfigs ...*aws.Config) sqsiface.SQSAPI {
-	awsSession := session.Must(session.NewSession())
-
-	return sqs.New(awsSession, awsConfigs...)
-}
 
 func (config *Config) populateDefaultValues() {
 	if config.MaxNumberOfMessage == 0 {
@@ -35,7 +26,7 @@ func getQueueURL(client QueueAPI, queueName string) (queueURL string) {
 		fmt.Println(err.Error())
 		return
 	}
-	queueURL = aws.StringValue(response.QueueUrl)
+	queueURL = aws.ToString(response.QueueUrl)
 
 	return
 }

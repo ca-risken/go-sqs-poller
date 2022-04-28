@@ -6,22 +6,23 @@ import (
 	"log"
 	"sync"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/ca-risken/common/pkg/logging"
 )
 
 // HandlerFunc is used to define the Handler that is run on for each message
-type HandlerFunc func(msg *sqs.Message) error
+type HandlerFunc func(msg *types.Message) error
 
 // HandleMessage wraps a function for handling sqs messages
-func (f HandlerFunc) HandleMessage(msg *sqs.Message) error {
+func (f HandlerFunc) HandleMessage(msg *types.Message) error {
 	return f(msg)
 }
 
 // Handler interface
 type Handler interface {
-	HandleMessage(msg *sqs.Message) error
+	HandleMessage(msg *types.Message) error
 }
 
 // InvalidEventError struct
@@ -62,10 +63,10 @@ type Worker struct {
 
 // Config struct
 type Config struct {
-	MaxNumberOfMessage int64
+	MaxNumberOfMessage int32
 	QueueName          string
 	QueueURL           string
-	WaitTimeSecond     int64
+	WaitTimeSecond     int32
 }
 
 // New sets up a new Worker
@@ -92,11 +93,11 @@ func (worker *Worker) Start(ctx context.Context, h Handler) {
 
 			params := &sqs.ReceiveMessageInput{
 				QueueUrl:            aws.String(worker.Config.QueueURL), // Required
-				MaxNumberOfMessages: aws.Int64(worker.Config.MaxNumberOfMessage),
-				AttributeNames: []*string{
-					aws.String("All"), // Required
+				MaxNumberOfMessages: worker.Config.MaxNumberOfMessage,
+				AttributeNames: []types.QueueAttributeName{
+					"All", // Required
 				},
-				WaitTimeSeconds: aws.Int64(worker.Config.WaitTimeSecond),
+				WaitTimeSeconds: worker.Config.WaitTimeSecond,
 			}
 
 			resp, err := worker.SqsClient.ReceiveMessage(params)
@@ -105,33 +106,33 @@ func (worker *Worker) Start(ctx context.Context, h Handler) {
 				continue
 			}
 			if len(resp.Messages) > 0 {
-				worker.run(ctx, h, resp.Messages)
+				worker.run(ctx, h, &resp.Messages)
 			}
 		}
 	}
 }
 
 // poll launches goroutine per received message and wait for all message to be processed
-func (worker *Worker) run(ctx context.Context, h Handler, messages []*sqs.Message) {
-	numMessages := len(messages)
+func (worker *Worker) run(ctx context.Context, h Handler, messages *[]types.Message) {
+	numMessages := len(*messages)
 	worker.Log.Info(ctx, fmt.Sprintf("worker: Received %d messages", numMessages))
 
 	var wg sync.WaitGroup
 	wg.Add(numMessages)
-	for i := range messages {
-		go func(m *sqs.Message) {
+	for _, i := range *messages {
+		go func(m *types.Message) {
 			// launch goroutine
 			defer wg.Done()
 			if err := worker.handleMessage(ctx, m, h); err != nil {
 				worker.Log.Error(ctx, err.Error())
 			}
-		}(messages[i])
+		}(&i)
 	}
 
 	wg.Wait()
 }
 
-func (worker *Worker) handleMessage(ctx context.Context, m *sqs.Message, h Handler) error {
+func (worker *Worker) handleMessage(ctx context.Context, m *types.Message, h Handler) error {
 	var err error
 	err = h.HandleMessage(m)
 	if _, ok := err.(InvalidEventError); ok {
@@ -148,7 +149,7 @@ func (worker *Worker) handleMessage(ctx context.Context, m *sqs.Message, h Handl
 	if err != nil {
 		return err
 	}
-	worker.Log.Debug(ctx, fmt.Sprintf("worker: deleted message from queue: %s", aws.StringValue(m.ReceiptHandle)))
+	worker.Log.Debug(ctx, fmt.Sprintf("worker: deleted message from queue: %s", aws.ToString(m.ReceiptHandle)))
 
 	return nil
 }

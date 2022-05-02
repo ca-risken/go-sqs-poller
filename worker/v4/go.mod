@@ -1,4 +1,4 @@
-module github.com/gassara-kys/go-sqs-poller/worker/v4
+module github.com/ca-risken/go-sqs-poller/worker/v4
 
 go 1.15
 

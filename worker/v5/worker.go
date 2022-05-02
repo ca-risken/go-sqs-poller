@@ -43,7 +43,7 @@ func NewInvalidEventError(event, msg string) InvalidEventError {
 // QueueAPI interface is the minimum interface required from a queue implementation to invoke New worker.
 // Invoking worker.New() takes in a queue name which is why GetQueueUrl is needed.
 type QueueAPI interface {
-	GetQueueUrl(*sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error)
+	GetQueueUrl(ctx context.Context, params *sqs.GetQueueUrlInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error)
 	QueueDeleteReceiverAPI
 }
 
@@ -70,9 +70,9 @@ type Config struct {
 }
 
 // New sets up a new Worker
-func New(client QueueAPI, config *Config) *Worker {
+func New(ctx context.Context, client QueueAPI, config *Config) *Worker {
 	config.populateDefaultValues()
-	config.QueueURL = getQueueURL(client, config.QueueName)
+	config.QueueURL = getQueueURL(ctx, client, config.QueueName)
 
 	return &Worker{
 		Config:    config,
@@ -100,7 +100,7 @@ func (worker *Worker) Start(ctx context.Context, h Handler) {
 				WaitTimeSeconds: worker.Config.WaitTimeSecond,
 			}
 
-			resp, err := worker.SqsClient.ReceiveMessage(params)
+			resp, err := worker.SqsClient.ReceiveMessage(ctx, params)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -145,7 +145,7 @@ func (worker *Worker) handleMessage(ctx context.Context, m *types.Message, h Han
 		QueueUrl:      aws.String(worker.Config.QueueURL), // Required
 		ReceiptHandle: m.ReceiptHandle,                    // Required
 	}
-	_, err = worker.SqsClient.DeleteMessage(params)
+	_, err = worker.SqsClient.DeleteMessage(ctx, params)
 	if err != nil {
 		return err
 	}

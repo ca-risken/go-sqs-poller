@@ -21,19 +21,19 @@ type mockedSqsClient struct {
 	mock.Mock
 }
 
-func (c *mockedSqsClient) GetQueueUrl(urlInput *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
+func (c *mockedSqsClient) GetQueueUrl(ctx context.Context, urlInput *sqs.GetQueueUrlInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error) {
 	url := fmt.Sprintf("https://sqs.%v.amazonaws.com/123456789/%v", c.Config.Region, *urlInput.QueueName)
 
 	return &sqs.GetQueueUrlOutput{QueueUrl: &url}, nil
 }
 
-func (c *mockedSqsClient) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.ReceiveMessageOutput, error) {
+func (c *mockedSqsClient) ReceiveMessage(ctx context.Context, input *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error) {
 	c.Called(input)
 
 	return &c.Response, nil
 }
 
-func (c *mockedSqsClient) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
+func (c *mockedSqsClient) DeleteMessage(ctx context.Context, input *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error) {
 	c.Called(input)
 	c.Response = sqs.ReceiveMessageOutput{}
 
@@ -71,16 +71,15 @@ func TestStart(t *testing.T) {
 	client := &mockedSqsClient{Response: sqsResponse, Config: awsConfig}
 	deleteInput := &sqs.DeleteMessageInput{QueueUrl: clientParams.QueueUrl}
 
-	worker := New(client, workerConfig)
-
 	ctx, cancel := contextAndCancel()
+	worker := New(ctx, client, workerConfig)
 	defer cancel()
 
 	handler := new(mockedHandler)
 	handlerFunc := HandlerFunc(func(msg *types.Message) (err error) {
 		event := &sqsEvent{}
 
-		json.Unmarshal([]byte(aws.ToString(msg.Body)), event)
+		_ = json.Unmarshal([]byte(aws.ToString(msg.Body)), event)
 
 		handler.HandleMessage(event.Foo, event.Qux)
 
@@ -98,7 +97,7 @@ func TestStart(t *testing.T) {
 		minimumConfig := &Config{
 			QueueName: "my-sqs-queue",
 		}
-		worker := New(client, minimumConfig)
+		worker := New(ctx, client, minimumConfig)
 
 		assert.Equal(t, worker.Config.QueueName, "my-sqs-queue", "QueueName has been set properly")
 		assert.Equal(t, worker.Config.QueueURL, "https://sqs.eu-west-1.amazonaws.com/123456789/my-sqs-queue", "QueueURL has been set properly")

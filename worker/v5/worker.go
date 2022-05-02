@@ -50,8 +50,8 @@ type QueueAPI interface {
 // QueueDeleteReceiverAPI interface is the minimum interface required to run a worker.
 // When a worker is in its Receive loop, it requires this interface.
 type QueueDeleteReceiverAPI interface {
-	DeleteMessage(*sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error)
-	ReceiveMessage(*sqs.ReceiveMessageInput) (*sqs.ReceiveMessageOutput, error)
+	DeleteMessage(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
+	ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
 }
 
 // Worker struct

@@ -120,13 +120,13 @@ func (worker *Worker) run(ctx context.Context, h Handler, messages *[]types.Mess
 	var wg sync.WaitGroup
 	wg.Add(numMessages)
 	for _, i := range *messages {
-		go func(m *types.Message) {
+		go func(m types.Message) {
 			// launch goroutine
 			defer wg.Done()
-			if err := worker.handleMessage(ctx, m, h); err != nil {
+			if err := worker.handleMessage(ctx, &m, h); err != nil {
 				worker.Log.Error(ctx, err.Error())
 			}
-		}(&i)
+		}(i)
 	}
 
 	wg.Wait()
